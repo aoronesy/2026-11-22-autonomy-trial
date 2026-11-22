@@ -44,14 +44,16 @@ jobs:
       - name: 危ないパスを確かめる（base 側のスクリプト）
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
-          OWNER_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'owner-approved') }}
+          # 承認として扱うのは、owner-approved を付けたときの実行（labeled）だけ。
+          # ラベルはコミットに結び付かないため、後の push（synchronize）や他のラベル操作では通さない。
+          OWNER_APPROVED: ${{ github.event.action == 'labeled' && github.event.label.name == 'owner-approved' }}
         run: |
           set -euo pipefail
           # 既定のシェルは -e 付き。終了コード（0 / 1 / 2）を取るため || で受ける。
           code=0
           bash scripts/check_risky_paths.sh "origin/${BASE_REF}" refs/remotes/pr/head || code=$?
           if [ "${code}" -eq 1 ] && [ "${OWNER_APPROVED}" = "true" ]; then
-            echo "owner-approved ラベルがあるため、上の危ないパスへの変更を承認済みとして通す"
+            echo "owner-approved ラベルが付いたため、上の危ないパスへの変更を承認済みとして通す"
             exit 0
           fi
           exit "${code}"

@@ -24,7 +24,8 @@
 ## 2026-11-22 risky-paths を base 側で動かし、owner-approved ラベルで通す（AOS-446）
 
 - 決定: `risky-paths` を `.github/workflows/risky-paths.yml`（`pull_request_target`、main 宛て、opened・synchronize・reopened・labeled・unlabeled）に移す。base 側（main）をチェックアウトして base 側の `scripts/check_risky_paths.sh` を使い、PR の head は `refs/pull/<番号>/head` を fetch して差分を見るだけにする。権限は `contents: read`・`pull-requests: read`、secrets は使わない。`ci.yml` は `test` だけにする。
-- 決定: PR に `owner-approved` ラベルがあれば、触れた危ないパスを出したうえで成功にする。承認の通り道は、オーナーの OK → 司令塔が `owner-approved` ラベルを付ける → `risky-paths` が再実行されて通る。
+- 決定: PR に `owner-approved` ラベルを付けたときの実行（`labeled` で、付けたラベルが `owner-approved`）は、触れた危ないパスを出したうえで成功にする。ラベルが残っていても、後の push（`synchronize`）や他のラベルの付け外し・reopen の実行では通さない。承認の通り道は、オーナーの OK → 司令塔が `owner-approved` ラベルを付ける → `risky-paths` が再実行されて通る。
 - 理由: これまでは PR 側のワークフローとスクリプトを実行していたため、PR が自分の検査を書き換えればすり抜けられた（「scripts/ を risky-paths の対象に足す」の理由に書いた問題）。base 側で動かせば、PR の変更は検査に効かない。PR のコードは実行しないので、`pull_request_target` でも PR から権限を使われない。オーナーの OK を、チェックを落としたままの手動マージではなく、必須チェックの緑で表せる。
 - 置き換え: 「scripts/ を risky-paths の対象に足す」の理由のうち「CI は PR 側の `scripts/check_risky_paths.sh` を実行する」は、この決定で当てはまらなくなる。`scripts/`・`.github/` は引き続き危ないパスとして扱う（検査の仕組みの変更はオーナーが確かめる）。
-- 限界: ラベルはコミットに結び付かず、承認後の push でも残る。新しい push があったら司令塔がラベルを外して聞き直す。worker とオーナーは同じ GitHub アカウントなので、ラベルを付けるのが司令塔だけというのは運用上の決まりで、GitHub の権限では強制できない。
+- 理由（ラベルを付けた実行だけ通す）: ラベルはコミットに結び付かず、承認後の push でも残る。権限を読み取りに絞ったままラベルを自動で外せないため、承認をラベルを付けた時点の head に限る。新しい push があったら、司令塔がラベルを外し、オーナーに聞き直して付け直す。
+- 限界: worker とオーナーは同じ GitHub アカウントなので、ラベルを付けるのが司令塔だけというのは運用上の決まりで、GitHub の権限では強制できない。また、PR が `pull_request` のワークフローに同じ名前のジョブ `risky-paths` を足すと、同じアプリ（GitHub Actions）から同名のチェックが出て、必須チェックを見かけ上満たせるおそれがある。そうした PR は `.github/` に触れるので本物の `risky-paths` は落ちるが、塞ぐにはブランチ保護か ruleset の変更（ワークフローを指定して必須にするなど）が要る。

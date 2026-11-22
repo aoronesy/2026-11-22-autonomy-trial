@@ -32,5 +32,5 @@ python -m unittest      # テストを実行する
 PR では次の 3 つが必須。詳しくは [AGENTS.md](AGENTS.md)。
 
 - `test`: `python -m unittest`
-- `risky-paths`: base 側の `scripts/check_risky_paths.sh`（危ないパスに触れたら失敗。`owner-approved` ラベルがあれば成功）
+- `risky-paths`: base 側の `scripts/check_risky_paths.sh`（危ないパスに触れたら失敗。`owner-approved` ラベルを付けたときの実行は成功）
 - `cross-review`: 別モデルのレビューが合格のとき success になる commit status
