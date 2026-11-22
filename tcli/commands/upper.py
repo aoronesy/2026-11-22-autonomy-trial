@@ -5,7 +5,7 @@ def run(args):
     first = "--first" in args
     text = " ".join(a for a in args if a != "--first")
     if first:
-        print(text[0].upper() + text[1:])
+        print(text[:1].upper() + text[1:])
     else:
         print(text.upper())
     return 0
