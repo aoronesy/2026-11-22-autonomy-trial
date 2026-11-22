@@ -17,6 +17,7 @@ python -m unittest      # テストを実行する
 ## コマンド一覧
 
 - `hello`: "hello" を出力する
+- `upper`: text を大文字にして出力する（`--first` を付けると先頭 1 文字だけ）
 - `reverse`: text を逆順にして出力する
 - `schema`: notes テーブルの SQL（migrations/001_create_notes.sql）を出力する
 
@@ -33,5 +34,5 @@ python -m unittest      # テストを実行する
 PR では次の 3 つが必須。詳しくは [AGENTS.md](AGENTS.md)。
 
 - `test`: `python -m unittest`
-- `risky-paths`: `scripts/check_risky_paths.sh`（危ないパスに触れたら失敗）
+- `risky-paths`: base 側の `scripts/check_risky_paths.sh`（危ないパスに触れたら失敗。`owner-approved` ラベルを付けたときの実行は成功）
 - `cross-review`: 別モデルのレビューが合格のとき success になる commit status

@@ -1,0 +1,67 @@
+name: risky-paths
+
+# pull_request_target は base 側（main）のワークフロー定義で動く。
+# 検査スクリプトも base 側のものを使い、PR の head は fetch して差分を見るだけにする。
+# PR のコードはチェックアウトも実行もしない（PR が自分の検査を書き換えてもすり抜けられない）。
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# 同じ PR の古い実行（ラベル前の opened など）が後から終わって結果を上書きしないよう、新しい実行で取り消す。
+concurrency:
+  group: risky-paths-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  risky-paths:
+    runs-on: ubuntu-latest
+    steps:
+      - name: base 側をチェックアウトする
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: PR の head を fetch する（チェックアウトしない）
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/pr/head"
+          fetched="$(git rev-parse refs/remotes/pr/head)"
+          if [ "${fetched}" != "${HEAD_SHA}" ]; then
+            echo "error: fetch した head（${fetched}）がイベントの head（${HEAD_SHA}）と違う。新しい push の実行を待つ" >&2
+            exit 2
+          fi
+
+      - name: 危ないパスを確かめる（base 側のスクリプト）
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # 承認として扱うのは、owner-approved を付けたときの実行（labeled）だけ。
+          # ラベルはコミットに結び付かないため、後の push（synchronize）や他のラベル操作では通さない。
+          OWNER_APPROVED: ${{ github.event.action == 'labeled' && github.event.label.name == 'owner-approved' }}
+        run: |
+          set -euo pipefail
+          # 既定のシェルは -e 付き。終了コード（0 / 1 / 2）を取るため || で受ける。
+          # ラベルで成功に変えるのは 1（危ないパスを見つけた）だけ。2（検査できなかった）やその他は常に失敗。
+          code=0
+          bash scripts/check_risky_paths.sh "origin/${BASE_REF}" refs/remotes/pr/head || code=$?
+          case "${code}" in
+            0) exit 0 ;;
+            1)
+              if [ "${OWNER_APPROVED}" = "true" ]; then
+                echo "owner-approved ラベルが付いたため、上の危ないパスへの変更を承認済みとして通す"
+                exit 0
+              fi
+              exit 1 ;;
+            *)
+              echo "error: 検査できなかった（終了コード ${code}）。ラベルがあっても通さない" >&2
+              exit 2 ;;
+          esac
