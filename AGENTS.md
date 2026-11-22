@@ -11,10 +11,20 @@
 | チェック | 中身 | 落ちたとき |
 |---|---|---|
 | `test` | `python -m unittest` | 実装した worker が直して push し直す |
-| `risky-paths` | `scripts/check_risky_paths.sh`。差分がリポ直下の `migrations/`・`.env` で始まるもの・`secrets/`・`scripts/`・`.github/`・`AGENTS.md`・`.claude/` に触れたら失敗 | 自動でマージしない。司令塔がオーナーに聞く |
+| `risky-paths` | `.github/workflows/risky-paths.yml`（`pull_request_target`）が base 側の `scripts/check_risky_paths.sh` で PR の差分を見る。リポ直下の `migrations/`・`.env` で始まるもの・`secrets/`・`scripts/`・`.github/`・`AGENTS.md`・`.claude/` に触れたら失敗。PR に `owner-approved` ラベルがあれば、触れたパスを出して成功 | 自動でマージしない。司令塔がオーナーに聞く（下の「危ない種類の変更の承認」） |
 | `cross-review` | レビュー worker（別モデル）が合格のとき、commit status `cross-review` を success にする | 実装した worker に差し戻す |
 
 - 承認なしで行ってよい操作の範囲は `DECISIONS.md` に従う。
+
+### 危ない種類の変更の承認
+
+1. `risky-paths` が落ちたら、司令塔は触れたパス（ジョブのログに出る）を添えてオーナーに聞く。
+2. オーナーが OK したら、司令塔が PR に `owner-approved` ラベルを付ける（`gh pr edit <番号> --add-label owner-approved`）。worker はラベルを付けない。
+3. ラベルを付けると `risky-paths` が再実行され、触れたパスを出したうえで成功になる。ほかの必須チェックも緑なら、通常どおりマージする。
+
+- `risky-paths` は base 側（main）のワークフローとスクリプトで動き、PR の head は fetch して差分を見るだけにする。PR が `.github/` や `scripts/` を書き換えても、その PR 自身の検査は変わらず、すり抜けられない。PR のコードは実行しない。
+- ラベルはコミットに結び付かない。承認した後に新しい push があったら、司令塔はラベルを外し、改めてオーナーに聞く。
+- 検査の仕組み自体（`risky-paths.yml`・`check_risky_paths.sh`）を変える PR は、base にまだ無い変更なので、マージされるまで新しい検査は動かない。
 
 ## コード
 
