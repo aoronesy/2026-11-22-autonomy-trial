@@ -142,6 +142,30 @@ class TestCheckRiskyPaths(unittest.TestCase):
         result = self.check("main", env=env)
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
 
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root は読み取り権限を無視する")
+    def test_unreadable_diff_file_exits_2(self):
+        # 書けるが読めない一時ファイルを mktemp に返させる。git diff の書き込みは通り、読み込みだけ失敗する。
+        self.commit_risky()
+        work = Path(self._tmp.name + "-unreadable")
+        work.mkdir()
+        self.addCleanup(shutil.rmtree, work, True)
+        env = self.env_with_shim(
+            "mktemp", f'f="{work}/diff.$$"\n: >"$f"\nchmod 200 "$f"\necho "$f"\n'
+        )
+        result = self.check("main", env=env)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("開けない", result.stderr)
+
+    def test_unterminated_diff_record_exits_2(self):
+        # 末尾が NUL で終わらない差分（読み切れていない）を、触れていないと誤らない。
+        real_git = shutil.which("git")
+        env = self.env_with_shim(
+            "git",
+            f'if [ "$1" = diff ]; then printf "migrations/001.sql"; exit 0; fi\nexec "{real_git}" "$@"\n',
+        )
+        result = self.check("main", env=env)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
     def test_not_a_git_repo_exits_2(self):
         with tempfile.TemporaryDirectory() as empty:
             result = subprocess.run(
