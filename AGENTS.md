@@ -11,7 +11,7 @@
 | チェック | 中身 | 落ちたとき |
 |---|---|---|
 | `test` | `python -m unittest` | 実装した worker が直して push し直す |
-| `risky-paths` | `scripts/check_risky_paths.sh`。差分がリポ直下の `migrations/`・`.env` で始まるもの・`secrets/`・`.github/`・`AGENTS.md`・`.claude/` に触れたら失敗 | 自動でマージしない。司令塔がオーナーに聞く |
+| `risky-paths` | `scripts/check_risky_paths.sh`。差分がリポ直下の `migrations/`・`.env` で始まるもの・`secrets/`・`scripts/`・`.github/`・`AGENTS.md`・`.claude/` に触れたら失敗 | 自動でマージしない。司令塔がオーナーに聞く |
 | `cross-review` | レビュー worker（別モデル）が合格のとき、commit status `cross-review` を success にする | 実装した worker に差し戻す |
 
 - 承認なしで行ってよい操作の範囲は `DECISIONS.md` に従う。

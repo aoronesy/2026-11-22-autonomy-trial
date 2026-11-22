@@ -23,7 +23,7 @@ if ! git diff --name-only -z --no-renames "${base}...HEAD" >"${tmp}"; then
   exit 2
 fi
 
-risky_pattern='^(migrations/|secrets/|\.github/|\.claude/|AGENTS\.md$|\.env)'
+risky_pattern='^(migrations/|secrets/|scripts/|\.github/|\.claude/|AGENTS\.md$|\.env)'
 
 hits=""
 while IFS= read -r -d '' path; do
