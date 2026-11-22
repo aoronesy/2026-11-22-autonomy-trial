@@ -17,7 +17,7 @@ python -m unittest      # テストを実行する
 ## コマンド一覧
 
 - `hello`: "hello" を出力する
-- `a`: text を大文字にして出力する
+- `upper`: text を大文字にして出力する
 
 コマンドを足したら、この一覧にも 1 行足す（`tests/test_readme.py` が `tcli/commands/` の全コマンドが載っているかを確かめる）。
 
