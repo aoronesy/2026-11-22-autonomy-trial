@@ -24,6 +24,12 @@ class UpperTest(unittest.TestCase):
     def test_first_option_position_is_free(self):
         self.assertEqual(self.run_upper(["hello", "--first"]), (0, "Hello\n"))
 
+    def test_first_with_empty_text(self):
+        self.assertEqual(self.run_upper(["--first", ""]), (0, "\n"))
+
+    def test_first_without_text(self):
+        self.assertEqual(self.run_upper(["--first"]), (0, "\n"))
+
 
 if __name__ == "__main__":
     unittest.main()
