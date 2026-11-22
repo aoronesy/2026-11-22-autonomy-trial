@@ -50,10 +50,18 @@ jobs:
         run: |
           set -euo pipefail
           # 既定のシェルは -e 付き。終了コード（0 / 1 / 2）を取るため || で受ける。
+          # ラベルで成功に変えるのは 1（危ないパスを見つけた）だけ。2（検査できなかった）やその他は常に失敗。
           code=0
           bash scripts/check_risky_paths.sh "origin/${BASE_REF}" refs/remotes/pr/head || code=$?
-          if [ "${code}" -eq 1 ] && [ "${OWNER_APPROVED}" = "true" ]; then
-            echo "owner-approved ラベルが付いたため、上の危ないパスへの変更を承認済みとして通す"
-            exit 0
-          fi
-          exit "${code}"
+          case "${code}" in
+            0) exit 0 ;;
+            1)
+              if [ "${OWNER_APPROVED}" = "true" ]; then
+                echo "owner-approved ラベルが付いたため、上の危ないパスへの変更を承認済みとして通す"
+                exit 0
+              fi
+              exit 1 ;;
+            *)
+              echo "error: 検査できなかった（終了コード ${code}）。ラベルがあっても通さない" >&2
+              exit 2 ;;
+          esac

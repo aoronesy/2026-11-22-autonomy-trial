@@ -50,11 +50,25 @@ class TestCheckRiskyPaths(unittest.TestCase):
         self.git("add", "-A")
         self.git("commit", "-q", "-m", message)
 
-    def check(self, *args):
+    def check(self, *args, env=None):
         return subprocess.run(
-            ["bash", str(SCRIPT), *args], cwd=self.repo, env=self.env,
+            [shutil.which("bash"), str(SCRIPT), *args], cwd=self.repo, env=env or self.env,
             capture_output=True, text=True,
         )
+
+    def env_with_shim(self, name, script):
+        """PATH の先頭に偽のコマンドを置いた環境を返す（内部エラーを起こすため）。"""
+        shim_dir = Path(self._tmp.name + "-shim")
+        shim_dir.mkdir(exist_ok=True)
+        self.addCleanup(shutil.rmtree, shim_dir, True)
+        shim = shim_dir / name
+        shim.write_text("#!/bin/sh\n" + script)
+        shim.chmod(0o755)
+        return {**self.env, "PATH": f"{shim_dir}{os.pathsep}{self.env['PATH']}"}
+
+    def commit_risky(self):
+        self.write("migrations/001.sql", "x\n")
+        self.commit("risky")
 
     def test_safe_change_passes(self):
         self.write("tcli/commands/x.py", "pass\n")
@@ -105,6 +119,36 @@ class TestCheckRiskyPaths(unittest.TestCase):
     def test_missing_ref_exits_2(self):
         self.assertEqual(self.check("no-such-base").returncode, 2)
         self.assertEqual(self.check("main", "no-such-head").returncode, 2)
+
+    # 内部エラーは、危ないパスに触れた差分があっても 1 ではなく 2 になる（ラベルで通らない）。
+
+    def test_too_many_args_exits_2(self):
+        self.commit_risky()
+        self.assertEqual(self.check("main", "HEAD", "extra").returncode, 2)
+
+    def test_mktemp_failure_exits_2(self):
+        self.commit_risky()
+        env = self.env_with_shim("mktemp", "exit 1\n")
+        result = self.check("main", env=env)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("migrations/001.sql", result.stdout)
+
+    def test_git_diff_failure_exits_2(self):
+        self.commit_risky()
+        real_git = shutil.which("git")
+        env = self.env_with_shim(
+            "git", f'if [ "$1" = diff ]; then exit 1; fi\nexec "{real_git}" "$@"\n'
+        )
+        result = self.check("main", env=env)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+
+    def test_not_a_git_repo_exits_2(self):
+        with tempfile.TemporaryDirectory() as empty:
+            result = subprocess.run(
+                [shutil.which("bash"), str(SCRIPT), "main"], cwd=empty, env=self.env,
+                capture_output=True, text=True,
+            )
+        self.assertEqual(result.returncode, 2)
 
 
 if __name__ == "__main__":
